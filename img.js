@@ -1,32 +1,59 @@
-const originalCanvas = document.createElement('canvas');
-originalCanvas.width = canvas.width;
-originalCanvas.height = canvas.height;
+getFile(e) {
+    const file = e.target.files[0];
+    const inputResult = this.chceck(file);
+    if (!inputResult) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
 
-originalCanvas
-  .getContext('2d')
-  .drawImage(canvas, 0, 0);
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
 
-// 測試：在全新的 Canvas 上合成一次浮水印
-const testCanvas = document.createElement('canvas');
-testCanvas.width = width;
-testCanvas.height = height;
+            const maxSize = 950;
 
-const testCtx = testCanvas.getContext('2d');
+            let width = img.width;
+            let height = img.height;
 
-// 使用純白背景，排除原本照片與既有浮水印
-testCtx.fillStyle = '#ffffff';
-testCtx.fillRect(0, 0, width, height);
+            if (width > height) {
+              if (width > maxSize) {
+                height *= maxSize / width;
+                width = maxSize;
+              }
+            } else {
+              if (height > maxSize) {
+                width *= maxSize / height;
+                height = maxSize;
+              }
+            }
 
-testCtx.save();
-testCtx.translate(width / 2, height / 2);
-testCtx.rotate(angle);
+            width = Math.round(width);
+            height = Math.round(height);
+          
+            canvas.width = width;
+            canvas.height = height;
 
-testCtx.drawImage(
-  textCanvas,
-  -textWidthPx / 2,
-  -textHeightPx / 2,
-  textWidthPx,
-  textHeightPx
-);
+            // 先繪製原始圖片
+            ctx.drawImage(img, 0, 0, width, height);
 
-testCtx.restore();
+            // 浮水印全部交由 addWatermark 處理
+            await this.addWatermark(canvas);
+          
+            // 維持原本 JPEG 品質 0.5
+            this.inputVal = canvas.toDataURL('image/jpeg', 0.5);
+            this.$emit('input', this.inputVal);
+          } catch {
+            this.newAlert.option.content = '圖片加載失敗';
+            this.newAlert.show = true;
+          }
+        };
+        img.src = event.target.result;
+      };
+      this.imgTitle = file.name;
+    } else {
+      this.alert.content = inputResult;
+      this.newAlert.show = true;
+    }
+  },
