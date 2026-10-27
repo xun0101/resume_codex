@@ -1,3 +1,11 @@
+const originalCanvas = document.createElement('canvas');
+originalCanvas.width = canvas.width;
+originalCanvas.height = canvas.height;
+
+originalCanvas
+  .getContext('2d')
+  .drawImage(canvas, 0, 0);
+
 // 測試：在全新的 Canvas 上合成一次浮水印
 const testCanvas = document.createElement('canvas');
 testCanvas.width = width;
