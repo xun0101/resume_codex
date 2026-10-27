@@ -1,3 +1,18 @@
+const copyWidth = Math.min(textCanvas.width, canvas.width);
+const copyHeight = Math.min(textCanvas.height, canvas.height);
+
+const imageData = textCtx.getImageData(
+  0,
+  0,
+  copyWidth,
+  copyHeight
+);
+
+ctx.putImageData(
+  imageData,
+  Math.floor((width - copyWidth) / 2),
+  Math.floor((height - copyHeight) / 2)
+);
 // 暫時用於 iOS 除錯
 const debugPanel = document.createElement('div');
 
