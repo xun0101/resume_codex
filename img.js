@@ -1,3 +1,35 @@
+// 暫時用於 iOS 除錯
+const debugPanel = document.createElement('div');
+
+debugPanel.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  overflow-y: auto;
+  background: white;
+  color: black;
+  padding: 20px;
+  box-sizing: border-box;
+`;
+
+const showDebugImage = (source, title) => {
+  const label = document.createElement('div');
+  label.textContent = title;
+
+  const img = document.createElement('img');
+  img.src = source.toDataURL('image/png');
+  img.style.cssText =
+    'display:block;width:100%;height:auto;margin-bottom:24px;';
+
+  debugPanel.appendChild(label);
+  debugPanel.appendChild(img);
+};
+
+showDebugImage(textCanvas, '1. 文字 Canvas');
+showDebugImage(canvas, '2. 合成後 Canvas');
+
+document.body.appendChild(debugPanel);
+
 
 async getFile(event) {
   const file = event.target.files?.[0];
