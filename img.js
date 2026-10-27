@@ -1,153 +1,161 @@
 
-methods: {
-  getFile(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+async getFile(event) {
+  const file = event.target.files?.[0];
 
-    const reader = new FileReader();
+  if (!file) return;
 
-    reader.onload = (event) => {
-      const img = new Image();
+  const reader = new FileReader();
 
-      img.onload = async () => {
-        try {
-          const maxSize = 950;
+  reader.onload = () => {
+    const img = new Image();
 
-          let width = img.width;
-          let height = img.height;
+    img.onload = async () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-          // 1. 計算最終圖片尺寸
-          if (width > height) {
-            if (width > maxSize) {
-              height *= maxSize / width;
-              width = maxSize;
-            }
-          } else {
-            if (height > maxSize) {
-              width *= maxSize / height;
-              height = maxSize;
-            }
+        const maxSize = 950;
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height *= maxSize / width;
+            width = maxSize;
           }
-
-          width = Math.round(width);
-          height = Math.round(height);
-
-          // 2. 建立高解析度 Canvas
-          const scale = 2;
-
-          const highCanvas = document.createElement('canvas');
-          highCanvas.width = width * scale;
-          highCanvas.height = height * scale;
-
-          const highCtx = highCanvas.getContext('2d');
-
-          // 3. 先繪製高解析度圖片
-          highCtx.drawImage(
-            img,
-            0,
-            0,
-            highCanvas.width,
-            highCanvas.height
-          );
-
-          // 4. 在高解析度 Canvas 上加浮水印
-          await this.addWatermark(highCanvas, scale);
-
-          // 5. 最後才縮小到正式輸出尺寸
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-
-          ctx.drawImage(
-            highCanvas,
-            0,
-            0,
-            width,
-            height
-          );
-
-          // 6. 維持 JPEG 品質 0.5
-          this.inputVal = canvas.toDataURL('image/jpeg', 0.5);
-          this.$emit('input', this.inputVal);
-
-        } catch (error) {
-          console.error('圖片處理失敗:', error);
+        } else {
+          if (height > maxSize) {
+            width *= maxSize / height;
+            height = maxSize;
+          }
         }
-      };
 
-      img.onerror = () => {
-        console.error('圖片載入失敗');
-      };
+        width = Math.round(width);
+        height = Math.round(height);
 
-      img.src = event.target.result;
+        canvas.width = width;
+        canvas.height = height;
+
+        // 先繪製原始圖片
+        // 這裡不設定 globalAlpha，避免影響原圖
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // 浮水印全部交由 addWatermark 處理
+        await this.addWatermark(canvas);
+
+        // 維持原本 JPEG 品質 0.5
+        this.inputVal = canvas.toDataURL('image/jpeg', 0.5);
+        this.$emit('input', this.inputVal);
+
+      } catch (error) {
+        console.error('圖片處理失敗:', error);
+      }
     };
 
-    reader.onerror = () => {
-      console.error('檔案讀取失敗');
+    img.onerror = () => {
+      console.error('圖片載入失敗');
     };
 
-    reader.readAsDataURL(file);
-  },
+    img.src = reader.result;
+  };
 
-  async addWatermark(canvas, scale = 2) {
-    const ctx = canvas.getContext('2d');
+  reader.onerror = () => {
+    console.error('檔案讀取失敗');
+  };
 
-    // 使用最終輸出尺寸計算浮水印
-    const width = canvas.width / scale;
-    const height = canvas.height / scale;
+  reader.readAsDataURL(file);
+},
 
-    const watermark = 'XXXXXXX用';
-    const fontFamily = 'TW-MOE-Std-Kai';
+async addWatermark(canvas) {
+  const ctx = canvas.getContext('2d');
 
-    const angle = -Math.atan2(height, width);
-    const diagonal = Math.hypot(width, height);
+  const width = canvas.width;
+  const height = canvas.height;
 
-    // 1. 等待字型載入
-    await document.fonts.load(
-      `bold 24px "${fontFamily}"`,
-      watermark
-    );
+  const watermark = 'XXXXXXX用';
+  const fontFamily = 'TW-MOE-Std-Kai';
 
-    // 2. 計算字體大小
-    let fontSize = Math.min(width, height) * 0.15;
+  // 保留原本的浮水印角度
+  const angle = -Math.atan2(height, width);
+  const diagonal = Math.hypot(width, height);
 
-    ctx.save();
+  // 保留原本的字體大小計算方式
+  let fontSize = Math.min(width, height) * 0.15;
 
-    // 使用 scale 放大座標系統
-    ctx.scale(scale, scale);
+  ctx.save();
+  ctx.font = `bold ${fontSize}px "${fontFamily}"`;
 
-    ctx.font = `bold ${fontSize}px "${fontFamily}"`;
+  const textWidth = ctx.measureText(watermark).width;
+  const targetWidth = diagonal * 0.85;
 
-    const textWidth = ctx.measureText(watermark).width;
-    const targetWidth = diagonal * 0.85;
-
-    if (textWidth > 0) {
-      fontSize *= targetWidth / textWidth;
-    }
-
-    fontSize = Math.min(
-      fontSize,
-      diagonal * 0.075
-    );
-
-    // 3. 移動到圖片中心並旋轉
-    ctx.translate(width / 2, height / 2);
-    ctx.rotate(angle);
-
-    // 4. 設定浮水印樣式
-    ctx.font = `bold ${fontSize}px "${fontFamily}"`;
-    ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // 5. 直接繪製高解析度旋轉文字
-    ctx.fillText(watermark, 0, 0);
-
-    ctx.restore();
+  if (textWidth > 0) {
+    fontSize *= targetWidth / textWidth;
   }
+
+  fontSize = Math.min(
+    fontSize,
+    diagonal * 0.075
+  );
+
+  ctx.restore();
+
+  const fontSpec = `bold ${fontSize}px "${fontFamily}"`;
+
+  // 沿用原本的字型載入方式
+  await document.fonts.load(fontSpec, watermark);
+
+  // 使用獨立文字 Canvas，維持 scale = 2
+  const scale = 2;
+
+  const textCanvas = document.createElement('canvas');
+  const textCtx = textCanvas.getContext('2d');
+
+  textCtx.font = fontSpec;
+
+  const metrics = textCtx.measureText(watermark);
+
+  const textWidthPx = Math.ceil(
+    metrics.width + fontSize * 2
+  );
+
+  const textHeightPx = Math.ceil(fontSize * 3);
+
+  textCanvas.width = Math.ceil(textWidthPx * scale);
+  textCanvas.height = Math.ceil(textHeightPx * scale);
+
+  textCtx.scale(scale, scale);
+
+  textCtx.font = fontSpec;
+
+  // 恢復半透明灰色文字
+  // 不使用 globalAlpha
+  textCtx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+  textCtx.textAlign = 'center';
+  textCtx.textBaseline = 'middle';
+
+  textCtx.fillText(
+    watermark,
+    textWidthPx / 2,
+    textHeightPx / 2
+  );
+
+  // 在最終圖片上合成浮水印
+  ctx.save();
+
+  ctx.translate(width / 2, height / 2);
+  ctx.rotate(angle);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  ctx.drawImage(
+    textCanvas,
+    -textWidthPx / 2,
+    -textHeightPx / 2,
+    textWidthPx,
+    textHeightPx
+  );
+
+  ctx.restore();
 }
